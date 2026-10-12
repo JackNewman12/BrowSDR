@@ -25,6 +25,7 @@ import {
 	CGEN_VCO_MAX,
 	SX_VCO_MIN,
 	SX_VCO_MAX,
+	SX_VCO_RANGES,
 	SX_DIV2_THRESHOLD,
 	REG_RESET,
 	REG_LML_CONF1,
@@ -66,6 +67,8 @@ import {
 import { LimeSDRTransport } from './transport';
 
 export abstract class LimeSDRClocks extends LimeSDRTransport {
+	protected sxLockWidth = 0;
+	protected sxReady = false;
 	// ── CGEN PLL (Clock Generator) ──────────────────────────────
 
 	async setCGENFrequency(freq_Hz: number): Promise<void> {
@@ -108,15 +111,17 @@ export abstract class LimeSDRClocks extends LimeSDRTransport {
 
 	// ── SX PLL (LO Synthesizer) ─────────────────────────────────
 
-	async setFrequencySXR(freq_Hz: number): Promise<void> {
+	async setFrequencySXR(freq_Hz: number, unstableBand = -1): Promise<void> {
+		this.sxReady = false;
 		try {
-			await this.programFrequencySXR(freq_Hz);
+			await this.programFrequencySXR(freq_Hz, unstableBand);
+			this.sxReady = true;
 		} finally {
 			await this.modifyReg(REG_RESET, 1, 0, this.rxChannel + 1);
 		}
 	}
 
-	protected async programFrequencySXR(freq_Hz: number): Promise<void> {
+	protected async programFrequencySXR(freq_Hz: number, unstableBand: number): Promise<void> {
 		await this.modifyReg(REG_RESET, 1, 0, 1);
 
 		// Find output divider
@@ -143,7 +148,7 @@ export abstract class LimeSDRClocks extends LimeSDRTransport {
 		let sxCfg = await this.readLMS7002(REG_SX_CFG);
 		sxCfg = setBits(sxCfg, 10, 10, en_div2); // EN_DIV2_DIVPROG
 		sxCfg = setBits(sxCfg, 9, 9, 0); // EN_INTONLY=0 (fractional mode)
-		sxCfg = setBits(sxCfg, 1, 1, 0); // PD_VCO=0
+		sxCfg = setBits(sxCfg, 2, 1, 0); // PD_VCO=0, PD_VCO_COMP=0
 		sxCfg = setBits(sxCfg, 0, 0, 1); // EN_G=1
 		await this.writeLMS7002(REG_SX_CFG, sxCfg);
 
@@ -157,45 +162,40 @@ export abstract class LimeSDRClocks extends LimeSDRTransport {
 		divReg = setBits(divReg, 8, 6, div_loch & 0x7);
 		await this.writeLMS7002(REG_SX_DIV, divReg);
 
-		// Try all 3 VCO bands, pick the best lock
+		// Search all bands at each bias, then verify the restored candidate. A band
+		// can lock during the search but need retuning after visiting another band.
+		// LimeSuite allows up to five attempts with increasing VCO bias current.
 		let bestVCO = -1;
 		let bestCSW = -1;
-		let bestScore = 999;
-
-		for (let sel = 0; sel < 3; sel++) {
-			await this.modifyReg(REG_SX_VCO, 2, 1, sel);
-			const locked = await this.tuneVCO('SX');
-			if (locked) {
-				const csw = getBits(this.regCache.get(REG_SX_VCO) ?? 0, 10, 3);
-				const score = Math.abs(csw - 128);
-				if (score < bestScore) {
-					bestScore = score;
-					bestVCO = sel;
-					bestCSW = csw;
+		let foundLock = false;
+		for (let attempt = 0; attempt < 5; attempt++) {
+			const candidates = await this.findSXCandidates(vcoFreq);
+			foundLock ||= candidates.length > 0;
+			// Margin from the comparator boundaries matters more than proximity to
+			// nominal CSW=128. A one-code lock can disappear as streaming starts.
+			candidates.sort(
+				(a, b) =>
+					Number(a.band === unstableBand) - Number(b.band === unstableBand) ||
+					b.width - a.width ||
+					Math.abs(a.csw - 128) - Math.abs(b.csw - 128),
+			);
+			for (const candidate of candidates) {
+				if (await this.restoreSXBand(candidate.band, candidate.csw, freq_Hz)) {
+					bestVCO = candidate.band;
+					bestCSW = getBits(await this.readLMS7002(REG_SX_VCO), 10, 3);
+					break;
 				}
 			}
-		}
-
-		if (bestVCO < 0) {
-			// Retry with higher VCO bias current
+			if (bestVCO >= 0) break;
 			const ict = getBits(await this.readLMS7002(REG_SX_ICT), 7, 0);
-			if (ict < 255) {
-				await this.modifyReg(REG_SX_ICT, 7, 0, Math.min(255, ict + 32));
-				// Retry once
-				for (let sel = 0; sel < 3; sel++) {
-					await this.modifyReg(REG_SX_VCO, 2, 1, sel);
-					const locked = await this.tuneVCO('SX');
-					if (locked) {
-						bestVCO = sel;
-						bestCSW = getBits(this.regCache.get(REG_SX_VCO) ?? 0, 10, 3);
-						break;
-					}
-				}
-			}
+			if (attempt === 4 || ict === 255) break;
+			await this.modifyReg(REG_SX_ICT, 7, 0, Math.min(255, ict + 32));
+		}
+		if (bestVCO < 0) {
+			throw new Error(`LimeSDR: SX VCO ${foundLock ? 'lost lock' : 'failed to lock'} at ${(freq_Hz / 1e6).toFixed(3)} MHz`);
 		}
 
-		if (bestVCO < 0) throw new Error(`LimeSDR: SX VCO failed to lock at ${(freq_Hz / 1e6).toFixed(3)} MHz`);
-		// Readback and verify actual programmed frequency
+		// Readback verifies the divider programming; the comparator above verifies lock.
 		const rbInt = getBits(await this.readLMS7002(REG_SX_INT), 13, 4);
 		const rbFracL = await this.readLMS7002(REG_SX_FRAC_L);
 		const rbFracH = getBits(await this.readLMS7002(REG_SX_INT), 3, 0);
@@ -206,59 +206,114 @@ export abstract class LimeSDRClocks extends LimeSDRTransport {
 		const rbVCO = (rbInt + 4 + rbFrac / (1 << 20)) * REF_CLK * rbDivisor;
 		const rbFreq = rbVCO / (1 << (rbDiv + 1));
 		console.log(
-			`LimeSDR: SXR locked at ${(freq_Hz / 1e6).toFixed(3)} MHz, actual=${(rbFreq / 1e6).toFixed(3)} MHz, VCO=${bestVCO}, CSW=${bestCSW}, div_loch=${div_loch}, INT=${rbInt}, FRAC=${rbFrac}, DIV=${rbDiv}, EN_DIV2=${rbEnDiv2}`,
+			`LimeSDR: SXR locked at ${(freq_Hz / 1e6).toFixed(3)} MHz, actual=${(rbFreq / 1e6).toFixed(3)} MHz, VCO=${bestVCO}, CSW=${bestCSW}, div_loch=${div_loch}, INT=${rbInt}, FRAC=${rbFrac}, DIV=${rbDiv}, EN_DIV2=${rbEnDiv2}, CFG=0x${(await this.readLMS7002(REG_SX_CFG)).toString(16)}`,
 		);
 
-		// Apply best VCO + CSW
-		let vcoReg = await this.readLMS7002(REG_SX_VCO);
-		vcoReg = setBits(vcoReg, 2, 1, bestVCO);
-		vcoReg = setBits(vcoReg, 10, 3, bestCSW);
-		await this.writeLMS7002(REG_SX_VCO, vcoReg);
-
 		this.currentFrequency = freq_Hz;
+	}
+
+	private async findSXCandidates(vcoFrequency: number): Promise<Array<{ band: number; csw: number; width: number }>> {
+		const candidates: Array<{ band: number; csw: number; width: number }> = [];
+		for (let band = 0; band < SX_VCO_RANGES.length; band++) {
+			const [minimum, maximum] = SX_VCO_RANGES[band];
+			// Comparator windows can appear even when this oscillator cannot
+			// reach the programmed target. Do not rank those as usable locks.
+			if (vcoFrequency < minimum || vcoFrequency > maximum) continue;
+			await this.modifyReg(REG_SX_VCO, 2, 1, band);
+			if (await this.tuneVCO('SX')) {
+				candidates.push({ band, csw: getBits(this.regCache.get(REG_SX_VCO) ?? 0, 10, 3), width: this.sxLockWidth });
+			}
+		}
+		return candidates;
+	}
+
+	protected async restoreSXBand(band: number, csw: number, freq_Hz: number): Promise<boolean> {
+		let vcoReg = await this.readLMS7002(REG_SX_VCO);
+		vcoReg = setBits(vcoReg, 2, 1, band);
+		vcoReg = setBits(vcoReg, 10, 3, csw);
+		await this.writeLMS7002(REG_SX_VCO, vcoReg);
+		if (await this.waitForSXLock()) return true;
+		console.warn(`LimeSDR: SXR band ${band} lost lock after restore; retuning at ${(freq_Hz / 1e6).toFixed(3)} MHz`);
+		return (await this.tuneVCO('SX')) && (await this.waitForSXLock());
+	}
+
+	protected async waitForSXLock(): Promise<boolean> {
+		// Require consecutive hardware comparator readings, allowing brief settling
+		// after a band change without accepting a transient lock indication.
+		let consecutive = 0;
+		for (let sample = 0; sample < 10; sample++) {
+			await delay(1);
+			consecutive = getBits(await this.readLMS7002(REG_SX_CMP), 13, 12) === 2 ? consecutive + 1 : 0;
+			if (consecutive === 3) {
+				// Live retunes can report lock for hundreds of ms, then intermittently
+				// unlock with the divider words unchanged. Observe a full second.
+				for (let hold = 0; hold < 20; hold++) {
+					await delay(50);
+					if (getBits(await this.readLMS7002(REG_SX_CMP), 13, 12) !== 2) return false;
+				}
+				return true;
+			}
+		}
+		return false;
 	}
 
 	// ── VCO Tuning (Binary Search for CSW) ──────────────────────
 
 	protected async tuneVCO(module: 'CGEN' | 'SX'): Promise<boolean> {
 		const isCGEN = module === 'CGEN';
+		if (!isCGEN) this.sxLockWidth = 0;
 		const addrCSW = isCGEN ? REG_CGEN_CSW : REG_SX_VCO;
 		const addrCMP = isCGEN ? REG_CGEN_CMP : REG_SX_CMP;
 		const cswMSB = isCGEN ? 8 : 10;
 		const cswLSB = isCGEN ? 1 : 3;
 
-		// Read comparator helper
-		const readCmp = async (): Promise<number> => {
-			const val = await this.readLMS7002(addrCMP);
-			return getBits(val, 13, 12);
-		};
-
-		// Binary search for CSW value
-		let csw = 0;
-		for (let bit = 7; bit >= 0; bit--) {
-			csw |= 1 << bit;
+		const checkCSW = async (csw: number): Promise<number> => {
 			await this.modifyReg(addrCSW, cswMSB, cswLSB, csw);
-			await delay(1); // Settling time
-			const cmp = await readCmp();
-			if (cmp & 0x01) {
-				// VCO too high, clear this bit
-				csw &= ~(1 << bit);
-			}
-		}
-
-		// Verify lock at found value and neighbors
-		for (const offset of [0, 1, -1, 2, -2]) {
-			const testCSW = Math.max(0, Math.min(255, csw + offset));
-			await this.modifyReg(addrCSW, cswMSB, cswLSB, testCSW);
 			await delay(1);
-			const cmp = await readCmp();
-			if (cmp === 2) {
-				// Locked
-				return true;
-			}
-		}
+			return getBits(await this.readLMS7002(addrCMP), 13, 12);
+		};
+		if (!isCGEN && !(await this.sxEndpointsBracketTarget(checkCSW))) return false;
 
-		return false;
+		// Comparator 0 = too low, 2 = locked, 3 = too high. Find both
+		// boundaries so we tune to the middle rather than the unstable upper edge.
+		// SX's capacitor bank can have a discontinuity at 128 (LimeSuite TuneVCO).
+		const ranges = isCGEN
+			? [[0, 255]]
+			: [
+					[0, 127],
+					[128, 255],
+				];
+		const locks: Array<[number, number]> = [];
+		for (const [start, end] of ranges) {
+			let low = start;
+			let high = end;
+			while (low < high) {
+				const mid = Math.floor((low + high) / 2);
+				if ((await checkCSW(mid)) === 0) low = mid + 1;
+				else high = mid;
+			}
+			if ((await checkCSW(low)) !== 2) continue;
+			const first = low;
+			high = end;
+			while (low < high) {
+				const mid = Math.ceil((low + high) / 2);
+				if ((await checkCSW(mid)) === 2) low = mid;
+				else high = mid - 1;
+			}
+			locks.push([first, low]);
+		}
+		if (locks.length === 0) return false;
+		if (locks.length === 2 && locks[0][1] + 1 === locks[1][0]) locks.splice(0, 2, [locks[0][0], locks[1][1]]);
+		const [low, high] = locks.reduce((best, range) => (range[1] - range[0] > best[1] - best[0] ? range : best));
+		const locked = (await checkCSW(Math.floor((low + high) / 2))) === 2;
+		if (locked && !isCGEN) this.sxLockWidth = high - low + 1;
+		return locked;
+	}
+
+	private async sxEndpointsBracketTarget(checkCSW: (csw: number) => Promise<number>): Promise<boolean> {
+		// LimeSuite rejects a band whose endpoint comparators cannot bracket
+		// the target before searching either half of the capacitor bank.
+		return (await checkCSW(0)) !== 3 && (await checkCSW(255)) !== 0;
 	}
 
 	// ── Interface Rate Configuration ────────────────────────────

@@ -37,6 +37,8 @@ import {
 	REG_AFE_CFG,
 	REG_CGEN_CFG,
 	REG_CGEN_DIV,
+	REG_SX_CMP,
+	REG_SX_VCO,
 	REG_RFE_EN,
 	REG_RFE_PATH,
 	REG_RFE_GAIN,
@@ -66,6 +68,23 @@ export class LimeSDR extends LimeSDRClocks {
 	readonly rxLevel = new LimeRxLevel();
 	readonly streamStats = new LimeStreamStats();
 	private packed = false;
+
+	get isStreaming(): boolean {
+		return this.rxRunning !== null;
+	}
+
+	async checkStreamingSXLock(): Promise<void> {
+		if (!this.rxRunning) return;
+		try {
+			await this.modifyReg(REG_RESET, 1, 0, 1);
+			if (this.sxReady && getBits(await this.readLMS7002(REG_SX_CMP), 13, 12) === 2) return;
+			const unstableBand = getBits(await this.readLMS7002(REG_SX_VCO), 2, 1);
+			console.warn('LimeSDR: SXR lost lock during reception; retuning with another usable band preferred');
+			await this.setFrequencySXR(this.currentFrequency, unstableBand);
+		} finally {
+			await this.modifyReg(REG_RESET, 1, 0, this.rxChannel + 1);
+		}
+	}
 
 	setLinkFormat(bits: number): void {
 		if (bits !== 12 && bits !== 16) throw new Error('LimeSDR: unsupported USB sample width');
@@ -123,6 +142,15 @@ export class LimeSDR extends LimeSDRClocks {
 			[0x0118, 0x418c],
 			[0x0119, 0x5292],
 			[0x011a, 0x3001],
+			// LimeSuite Init's SX bias and loop filter values are required as well
+			// as the divider words that setFrequencySXR programs later.
+			[0x011c, 0x8941],
+			[0x011d, 0x0000],
+			[0x011e, 0x0984],
+			[0x0120, 0xe6c0],
+			[0x0121, 0x3638],
+			[0x0122, 0x0514],
+			[0x0123, 0x200f],
 			[0x0400, 0x8081],
 			[0x0404, 0x0006],
 			[0x040b, 0x1020],
@@ -347,6 +375,7 @@ export class LimeSDR extends LimeSDRClocks {
 		);
 
 		let firstPacketLogged = false;
+		let receiveReady = false;
 		let resolveStarted!: () => void;
 		let rejectStarted!: (error: Error) => void;
 		const started = new Promise<void>((resolve, reject) => {
@@ -402,7 +431,7 @@ export class LimeSDR extends LimeSDRClocks {
 					if (!usbOnly) {
 						this.rxLevel.observe(dv, Date.now(), packed);
 						const outPos = decodeStreamPcm(dv, outBuf, packed);
-						if (outPos > 0) callback(outBuf.subarray(0, outPos));
+						if (receiveReady && this.sxReady && outPos > 0) callback(outBuf.subarray(0, outPos));
 					}
 					resolveStarted();
 					this.streamStats.observeService(performance.now() - serviceStart);
@@ -423,12 +452,25 @@ export class LimeSDR extends LimeSDRClocks {
 		for (let index = 0; index < NUM_TRANSFERS; index++) transfers.push(transfer());
 		try {
 			await started;
+			await this.verifyStreamingSXLock();
+			receiveReady = true;
 			console.log('LimeSDR: USB IQ stream active');
 		} catch (error) {
 			await this.stopStreaming();
 			throw error;
 		} finally {
 			clearTimeout(startTimer);
+		}
+	}
+
+	protected async verifyStreamingSXLock(): Promise<void> {
+		try {
+			await this.modifyReg(REG_RESET, 1, 0, 1);
+			if (await this.waitForSXLock()) return;
+			console.warn('LimeSDR: SXR lost lock after RX start; retuning under the active receive clocks');
+			await this.setFrequencySXR(this.currentFrequency);
+		} finally {
+			await this.modifyReg(REG_RESET, 1, 0, this.rxChannel + 1);
 		}
 	}
 
