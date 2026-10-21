@@ -4,6 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 import fs from 'fs';
 
+// Match production's cross-origin isolation; DAB's threaded decoder needs SharedArrayBuffer,
+// and its thread workers load from /wasm/welle/welle.js, so those responses need it too.
+const crossOriginIsolation = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' };
+
 // Plugin that runs after the main build to:
 // 1. Bundle the dsp-worker properly (Vite doesn't bundle nested workers)
 // 2. Copy WASM files to dist
@@ -170,6 +174,7 @@ export default defineConfig({
 		},
 	},
 	server: {
+		headers: crossOriginIsolation,
 		proxy: {
 			'/api': 'http://localhost:8787',
 			'/hf-proxy': 'http://localhost:8787',
@@ -181,6 +186,7 @@ const wasmAssets = {
 	dsp: ['browsdr_dsp.js', 'browsdr_dsp_bg.wasm'],
 	mbelib: ['mbelib.js', 'mbelib.wasm', 'COPYRIGHT', 'NOTICE'],
 	rtl433: ['rtl433.js', 'rtl433.wasm', 'COPYING', 'NOTICE'],
+	welle: ['welle.js', 'welle.wasm', 'COPYING', 'NOTICE'],
 };
 
 function copyDecoderAssets(distDir: string) {
@@ -204,7 +210,7 @@ function wasmAssetsPlugin(): Plugin {
 		configureServer(server) {
 			server.middlewares.use((request, response, next) => {
 				const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
-				const match = /^\/wasm\/(dsp|mbelib|rtl433)\/([^/]+)$/.exec(pathname);
+				const match = /^\/wasm\/(dsp|mbelib|rtl433|welle)\/([^/]+)$/.exec(pathname);
 				if (!match) return next();
 				const module = match[1] as keyof typeof wasmAssets;
 				const file = match[2];
@@ -219,6 +225,7 @@ function wasmAssetsPlugin(): Plugin {
 					response.end();
 					return;
 				}
+				for (const [name, value] of Object.entries(crossOriginIsolation)) response.setHeader(name, value);
 				response.setHeader(
 					'Content-Type',
 					file.endsWith('.wasm') ? 'application/wasm' : file.endsWith('.js') ? 'text/javascript' : 'text/plain',

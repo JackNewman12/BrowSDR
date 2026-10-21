@@ -9,6 +9,7 @@ export const IF_RATES: Record<string, number> = {
 	cw: 3000,
 	raw: 48000,
 	dsd: 48000,
+	dab: 2048000,
 };
 
 export const AUDIO_RATE = 48000;

@@ -10,6 +10,7 @@ import part8 from './device-picker.html?raw';
 import part9 from './remote-connect.html?raw';
 import part10 from './about.html?raw';
 import part11 from './vfo-conflict.html?raw';
+import dabPanel from '@/app/decoders/dab/panel.html?raw';
 
 export default [
 	part0,
@@ -18,6 +19,7 @@ export default [
 	part3,
 	'<AdsbPanel /><AisPanel /><RadiosondePanel /><BlePanel /><AcarsPanel /><DiscoveryPanel />',
 	part4,
+	dabPanel,
 	part5,
 	part6,
 	part7,

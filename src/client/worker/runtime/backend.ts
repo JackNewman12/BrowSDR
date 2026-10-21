@@ -6,6 +6,7 @@ import type {
 	PocsagStatusCallback,
 	RdsCallback,
 	Rtl433Callback,
+	DabCallback,
 	AdsbCallback,
 	AisCallback,
 	RadiosondeCallback,
@@ -244,6 +245,7 @@ export class Backend {
 		bleCallback: BleCallback | null = null,
 		acarsCallback: AcarsCallback | null = null,
 		radiosondeCallback: RadiosondeCallback | null = null,
+		dabStatusCallback: DabCallback | null = null,
 	): Promise<void> {
 		return startRxStream(
 			this,
@@ -261,6 +263,7 @@ export class Backend {
 			bleCallback,
 			acarsCallback,
 			radiosondeCallback,
+			dabStatusCallback,
 		);
 	}
 

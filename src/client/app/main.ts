@@ -30,6 +30,7 @@ import { bookmarkMethods } from './workspace/bookmarks';
 import { whisperMethods } from './decoders/whisper';
 import { pocsagMethods } from './decoders/pocsag';
 import { dsdMethods } from './decoders/dsd';
+import { dabMethods } from './decoders/dab';
 import { rdsMethods } from './decoders/rds';
 import { zoomMethods } from './display/zoom';
 import { remoteMethods } from './workspace/remote';
@@ -84,6 +85,7 @@ const Receiver = {
 		...whisperMethods,
 		...pocsagMethods,
 		...dsdMethods,
+		...dabMethods,
 		...rdsMethods,
 		...zoomMethods,
 		...remoteMethods,

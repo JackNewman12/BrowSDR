@@ -21,6 +21,7 @@ import type { WhisperMessage } from '@/transcription/types';
 import type { RDSMessage, POCSAGMessage, POCSAGStatus, Rtl433Protocol, Rtl433Message } from '@/worker/decoders/types';
 import type { PocsagLogEntry } from '@/app/decoders/types';
 import type { DSDStatus } from '@/worker/decoders/dsd/types';
+import type { DabStatus } from '@/worker/decoders/types';
 import type { ReceiverCommand } from '@/remote/types';
 
 export interface ReceiverInternals {
@@ -181,6 +182,17 @@ export interface ReceiverMethods {
 	clearPocsag(): void;
 	exportPocsag(): void;
 	_onDsdStatus(vfoIndex: number, status: DSDStatus): void;
+	_onDabStatus(vfoIndex: number, status: DabStatus): void;
+	dabChannels(): Array<{ name: string; freq: number }>;
+	dabChannelName(freq: number): string;
+	dabFits(freq: number): boolean;
+	tuneDabChannel(index: number, name: string): void;
+	dabServices(index: number): DabStatus['services'];
+	dabVfos(): number[];
+	dabStationLabel(index: number): string;
+	dabStationInfo(index: number): string;
+	dabBroadcastTime(index: number): string;
+	dabConstellationPath(index: number): string;
 	_rdsStation(vfoIndex: number): AppInstance['rds']['stations'][number];
 	rdsActive(): AppInstance['rds']['stations'][number];
 	_onRdsMessage(vfoIndex: number, freqMhz: number, msg: RDSMessage): void;

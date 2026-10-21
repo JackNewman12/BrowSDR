@@ -7,6 +7,7 @@ All native decoder sources, build adapters, and committed browser bundles live h
 | `dsp/` | Shared Rust DSP for every SDR device | `dsp/pkg/` | `npm run build:dsp` |
 | `mbelib/` | Digital voice codec | `mbelib/pkg/` | `npm run build:mbelib` |
 | `rtl433/` | Device protocol decoder | `rtl433/pkg/` | `npm run build:rtl433` |
+| `welle/` | DAB/DAB+ broadcast decoder | `welle/pkg/` | `npm run build:welle` |
 
 Run commands from the repository root. DSP requires Rust and wasm-pack; the C
 codecs require the pinned Emscripten version described in their READMEs.

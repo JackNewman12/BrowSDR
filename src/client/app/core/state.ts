@@ -16,6 +16,7 @@ import type { Bookmark } from '@/app/workspace/types';
 import type { Vfo } from './types';
 import { makeDefaultVfo, BOOKMARK_CATEGORIES } from './constants';
 import type { DSDStatus } from '@/worker/decoders/dsd/types';
+import type { DabStatus } from '@/worker/decoders/types';
 import type { CapabilityIssue } from '@/platform/types';
 import type { Rtl433Status, Rtl433Protocol } from '@/worker/decoders/types';
 import { DEFAULT_FFT_SIZE, DEFAULT_SPECTRUM_RANGE } from '@/display/spectrum-range';
@@ -151,6 +152,7 @@ function createDecoderAndBookmarkState() {
 			status: [] as Array<POCSAGStatus | null>,
 		},
 		dsdStatus: [] as Array<DSDStatus | null>,
+		dabStatus: [] as Array<DabStatus | null>,
 		ble: {
 			panelOpen: false,
 			tuning: false,
@@ -176,6 +178,7 @@ function createDecoderAndBookmarkState() {
 			filter: '',
 			showProtocols: false,
 		},
+		dab: { panelOpen: false },
 		rds: {
 			panelOpen: false,
 			stations: {} as RdsStations,

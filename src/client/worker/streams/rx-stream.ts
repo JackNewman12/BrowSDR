@@ -17,6 +17,7 @@ import type {
 	BleCallback,
 	AcarsCallback,
 	DsdCallback,
+	DabCallback,
 } from '@/worker/runtime/callbacks.types';
 
 /*
@@ -65,6 +66,7 @@ export async function startRxStream(
 	bleCallback: BleCallback | null = null,
 	acarsCallback: AcarsCallback | null = null,
 	radiosondeCallback: RadiosondeCallback | null = null,
+	dabStatusCallback?: DabCallback | null,
 ): Promise<void> {
 	if (_streamStarting) return;
 	_streamStarting = true;
@@ -74,11 +76,9 @@ export async function startRxStream(
 	try {
 		const { device } = backend;
 		if (!device) throw new Error('No device connected');
-		const { centerFreq, frequencyShift = 0, sampleRate, fftSize, gains } = opts;
+		const { centerFreq, sampleRate, fftSize, gains } = opts;
 
-		await device.setSampleRate(sampleRate);
-		await device.setFrequency(displayToDeviceFrequencyHz(centerFreq, frequencyShift));
-		await configureReceiveGains(device, gains);
+		await prepareDevice(device, opts);
 		if (import.meta.env.DEV && device.deviceType === 'limesdr' && gains?.['Receive Mode'] === 1) {
 			return await startUsbOnlyStream(backend, sampleRate);
 		}
@@ -119,6 +119,7 @@ export async function startRxStream(
 			bleCallback,
 			acarsCallback,
 			radiosondeCallback,
+			dabStatusCallback,
 		});
 
 		// ── DSP Performance Counters ──────────────────────────────────
@@ -260,6 +261,13 @@ function processSpectrumChunk(
 	return { iqBufferPos, lastSpectrumTime, useFlip, specFlip, specFlop };
 }
 
+/** Apply rate, tuning and gains before streaming. */
+async function prepareDevice(device: NonNullable<Backend['device']>, opts: RxStreamOpts): Promise<void> {
+	await device.setSampleRate(opts.sampleRate);
+	await device.setFrequency(displayToDeviceFrequencyHz(opts.centerFreq, opts.frequencyShift ?? 0));
+	await configureReceiveGains(device, opts.gains);
+}
+
 function skipRetuningInput(backend: Backend): boolean {
 	return backend._retuning || performance.now() < backend._settleUntil;
 }
@@ -276,6 +284,7 @@ function initializeWorkers(
 		bleCallback: BleCallback | null;
 		acarsCallback: AcarsCallback | null;
 		radiosondeCallback: RadiosondeCallback | null;
+		dabStatusCallback?: DabCallback | null;
 	},
 ): void {
 	initializeVfoWorkers(
@@ -290,6 +299,7 @@ function initializeWorkers(
 		callbacks.bleCallback,
 		callbacks.acarsCallback,
 		callbacks.radiosondeCallback,
+		callbacks.dabStatusCallback,
 	);
 }
 

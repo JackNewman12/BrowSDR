@@ -98,6 +98,7 @@ export const vfoMethods = {
 				rtl433: vfo.rtl433 && inBandwidth,
 				rtl433SampleRate: vfo.rtl433SampleRate,
 				rtl433Protocols: vfo.rtl433Protocols,
+				dabService: vfo.dabService,
 			};
 
 			if (this.remoteMode === 'client' && this._webrtc) {

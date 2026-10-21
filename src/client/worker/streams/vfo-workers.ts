@@ -2,6 +2,7 @@ import type {
 	RdsCallback,
 	Rtl433Callback,
 	DsdCallback,
+	DabCallback,
 	AdsbCallback,
 	AisCallback,
 	RadiosondeCallback,
@@ -25,6 +26,7 @@ export function initializeVfoWorkers(
 	bleCallback: BleCallback | null = null,
 	acarsCallback: AcarsCallback | null = null,
 	radiosondeCallback: RadiosondeCallback | null = null,
+	dabStatusCallback: DabCallback | null = null,
 ) {
 	const initialBandwidth = 150000;
 
@@ -100,6 +102,7 @@ export function initializeVfoWorkers(
 				bleCallback,
 				acarsCallback,
 				radiosondeCallback,
+				dabStatusCallback,
 			);
 		worker.postMessage({
 			type: 'init',
@@ -131,6 +134,7 @@ export function routeLocalWorkerMessage(
 	bleCallback: BleCallback | null = null,
 	acarsCallback: AcarsCallback | null = null,
 	radiosondeCallback: RadiosondeCallback | null = null,
+	dabStatusCallback: DabCallback | null = null,
 ) {
 	if (routePacketMessage(backend, worker, msg, bleCallback, aisCallback, adsbCallback, acarsCallback, radiosondeCallback)) return;
 
@@ -150,16 +154,25 @@ export function routeLocalWorkerMessage(
 		// Forward decoded RDS using the worker's current VFO index.
 		const params = backend.vfoParams![currentIndex];
 		if (rdsCallback && params) rdsCallback(currentIndex, params.freq, msg.msg);
-	} else if (msg.type === 'dsd_status') {
-		const currentIndex = backend.dspWorkers!.indexOf(worker);
-		if (currentIndex === -1) return;
-		if (dsdStatusCallback) dsdStatusCallback(currentIndex, msg.status);
+	} else if (msg.type === 'dsd_status' || msg.type === 'dab_status') {
+		routeDigitalStatus(backend.dspWorkers!.indexOf(worker), msg, dsdStatusCallback, dabStatusCallback);
 	} else if (msg.type === 'dsp_debug_log') {
 		logWorkerMessage(backend, worker, msg);
 	} else if (msg.type === 'error') {
 		const currentIndex = backend.dspWorkers!.indexOf(worker);
 		console.error(`[DSP Worker ${currentIndex}] Error:`, msg.error);
 	}
+}
+
+function routeDigitalStatus(
+	index: number,
+	msg: Extract<DspOutput, { type: 'dsd_status' | 'dab_status' }>,
+	dsdStatusCallback: DsdCallback | null,
+	dabStatusCallback: DabCallback | null,
+): void {
+	if (index === -1) return; // worker was removed
+	if (msg.type === 'dsd_status') dsdStatusCallback?.(index, msg.status);
+	else dabStatusCallback?.(index, msg.status);
 }
 
 function routeSensorMessage(

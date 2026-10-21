@@ -53,6 +53,8 @@ export interface VfoParams {
 	pocsagSecondGuess?: boolean;
 	rds: boolean;
 	rdsRegion: string;
+	/** DAB service ID to play when mode === 'dab'; 0 plays nothing. */
+	dabService?: number;
 }
 
 export interface VfoState {

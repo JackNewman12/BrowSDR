@@ -23,6 +23,7 @@ export default defineConfig(
 		'**/target/**',
 		'wasm/rtl433/**',
 		'wasm/mbelib/**',
+		'wasm/welle/**',
 		'types/worker.d.ts',
 	]),
 	{

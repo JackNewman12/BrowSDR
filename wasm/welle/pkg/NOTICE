@@ -1,0 +1,13 @@
+welle.io DAB/DAB+ browser decoder for BrowSDR
+
+Upstream: https://github.com/AlbrechtL/welle.io
+Revision: 512558d1f8ac4c524d3c63e97510ea36c1bd7a70
+Source archive SHA-256: 3e9ea96fa6fe84ebd16ac736f29ae87c1489be9c722648f935500ef26ad4bdae
+Compiler: Emscripten 4.0.7
+License: GPL-2.0-or-later; see COPYING and upstream per-file copyright notices.
+Bundled upstream libraries: FAAD2 (GPL-2.0-or-later), mpg123 (LGPL-2.1),
+KISS FFT (BSD-3-Clause) and Phil Karn's FEC library (LGPL-2.1).
+
+Corresponding source: upstream revision above, wasm/welle/wrapper.cpp and
+wasm/welle/build.sh in the BrowSDR source repository. Only the receiver backend
+and its bundled libraries are compiled; upstream source is unchanged.
