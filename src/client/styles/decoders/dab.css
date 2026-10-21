@@ -53,6 +53,11 @@
 	stroke-width: 0.06;
 	stroke-linecap: round;
 }
+/* Fit the station cards instead of the fixed log-panel height. */
+.pocsag-panel.dab-dock {
+	height: auto;
+	max-height: 50vh;
+}
 .dab-cards {
 	flex: 1;
 	overflow-y: auto;

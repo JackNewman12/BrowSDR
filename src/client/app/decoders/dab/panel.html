@@ -1,5 +1,5 @@
 <!-- DAB Panel -->
-<div class="pocsag-panel" v-if="dab.panelOpen">
+<div class="pocsag-panel dab-dock" v-if="dab.panelOpen">
 	<UiToolHeader variant="pocsag" closable close-label="Close DAB panel" @close="dab.panelOpen = false">
 		DAB Radio
 		<span class="pocsag-count" v-if="dabVfos().length">{{ dabVfos().length }} VFO{{ dabVfos().length > 1 ? 's' : '' }}</span>
