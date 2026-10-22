@@ -15,4 +15,5 @@ receiver compiled to WebAssembly.
   transmitter, lower the gain.
 - The page must be cross-origin isolated, because the decoder uses threads.
 - One station per VFO. Now-playing text and slides come only from that station.
+- Remote access clients cannot choose a station; the station list is not sent to them.
 - Transmitter identification and saving the station in a bookmark are not implemented.

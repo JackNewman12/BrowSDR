@@ -94,6 +94,9 @@ describe('remote command boundaries', () => {
 		expect(isReceiverCommand({ type: 'vfoUpdate', index: 0, params })).toBe(true);
 		expect(isReceiverCommand({ type: 'vfoUpdate', index: 0, params: { ...params, squelchEnabled: 'yes' } })).toBe(false);
 		expect(isReceiverCommand({ type: 'vfoUpdate', index: 0, params: { ...params, freq: Infinity } })).toBe(false);
+		expect(isReceiverCommand({ type: 'vfoUpdate', index: 0, params: { ...params, dabService: 0x1234 } })).toBe(true);
+		expect(isReceiverCommand({ type: 'vfoUpdate', index: 0, params: { ...params, dabService: -1 } })).toBe(false);
+		expect(isReceiverCommand({ type: 'vfoUpdate', index: 0, params: { ...params, dabService: 1.5 } })).toBe(false);
 	});
 	it('rejects invalid capabilities and sensor discriminators', () => {
 		expect(
