@@ -6,6 +6,7 @@ import type { DataConnection } from 'peerjs';
 import type { DeviceCapabilities } from '@/radio/types';
 import type { RadioState } from '@/app/core/types';
 import type { VfoParams, PerfReport } from '@/worker/runtime/types';
+import type { RemoteDabStatus } from '@/worker/runtime/callbacks.types';
 import type { AdsbMessage } from '@/worker/decoders/adsb/types';
 import type { POCSAGMessage, POCSAGStatus, RDSMessage, Rtl433Message } from '@/worker/decoders/types';
 
@@ -55,6 +56,7 @@ export type RemoteCommand =
 	| { type: 'pocsag'; vfoIndex: number; freq: number; msg: POCSAGMessage }
 	| { type: 'pocsag_status'; vfoIndex: number; freq: number; status: POCSAGStatus }
 	| { type: 'rds'; vfoIndex: number; freq: number; msg: RDSMessage }
+	| { type: 'dab_status'; vfoIndex: number; status: RemoteDabStatus }
 	| { type: 'squelchState'; squelchOpen: boolean[] }
 	| { type: 'requestChange'; target: string; property: string; value: number };
 export type ReceiverCommand = RemoteCommand & { receiverId?: string };

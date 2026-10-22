@@ -200,6 +200,9 @@ export class DabStream {
 		this.onStatus({
 			...IDLE_STATUS,
 			...raw,
+			// JSON turns NaN (e.g. SNR before sync) into null.
+			snr: typeof raw.snr === 'number' ? raw.snr : 0,
+			constellation: Array.isArray(raw.constellation) ? raw.constellation.map((value) => (typeof value === 'number' ? value : 0)) : [],
 			slide: this.slide,
 			state: 'receiving',
 			message: raw.sync ? 'Synchronised' : 'Searching for DAB signal',

@@ -1,6 +1,6 @@
 import { isRecord } from '@/platform/data';
 import { packAudio } from '@/audio/pcm';
-import type { HostStats } from '@/worker/runtime/callbacks.types';
+import type { HostStats, RemoteDabStatus } from '@/worker/runtime/callbacks.types';
 import type { ReceiverCommand, StatusMessage } from '@/remote/types';
 import type { AppInstance } from '@/app/core/receiver.types';
 import * as Comlink from 'comlink';
@@ -96,6 +96,11 @@ export const remoteMethods = {
 		// ~40 KB/s (2048 uint8 @ 20fps) — a ~128× reduction that prevents the
 		// DataChannel from saturating and the waterfall from freezing.
 		await installHostStreamCallbacks.call(this);
+		await this.backend.setRemoteHostDabCallback(
+			Comlink.proxy((clientId: string, vfoIndex: number, status: RemoteDabStatus) => {
+				this._webrtc?.sendCommandTo(clientId, { type: 'dab_status', vfoIndex, status });
+			}),
+		);
 	},
 	async connectRemoteClient(this: AppInstance, hostId: string) {
 		if (this.workspace && !this._receiverTransport) return this.workspace.connectRemote(hostId);
@@ -550,6 +555,12 @@ function handleRds(this: AppInstance, cmd: Extract<ReceiverCommand, { type: 'rds
 	}
 }
 
+function handleDabStatus(this: AppInstance, cmd: Extract<ReceiverCommand, { type: 'dab_status' }>) {
+	if (this.remoteMode !== 'client' || this.vfos[cmd.vfoIndex]?.mode !== 'dab') return;
+	// The host omits an unchanged slide.
+	this._onDabStatus(cmd.vfoIndex, { ...cmd.status, slide: cmd.status.slide ?? this.dabStatus[cmd.vfoIndex]?.slide ?? '' });
+}
+
 function handleSquelchState(this: AppInstance, cmd: Extract<ReceiverCommand, { type: 'squelchState' }>, _clientId: string | null) {
 	if (this.remoteMode === 'client') {
 		// Apply host-side squelch states to local VFO state so
@@ -622,6 +633,10 @@ function handlePacketTelemetry(this: AppInstance, cmd: ReceiverCommand): boolean
 	}
 	if (cmd.type === 'acars') {
 		handleAcars.call(this, cmd);
+		return true;
+	}
+	if (cmd.type === 'dab_status') {
+		handleDabStatus.call(this, cmd);
 		return true;
 	}
 	if (cmd.type !== 'ble') return false;

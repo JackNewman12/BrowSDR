@@ -155,6 +155,8 @@ export interface RemoteClientState {
 	/** Per-index charset key currently applied, to detect live changes. */
 	pocsagCharsets?: Array<CharsetKey | undefined>;
 	rdsDecoders: Array<RDSDecoder | null>;
+	/** Per-index slide last sent, so unchanged slides are not resent. */
+	dabSlides?: string[];
 	squelchOpen: boolean[];
 }
 

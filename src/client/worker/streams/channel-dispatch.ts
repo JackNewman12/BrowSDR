@@ -187,6 +187,7 @@ function needsIq(params: VfoParams): boolean {
 		params.enabled ||
 		params.pocsag ||
 		(params.rds && params.mode === 'wfm') ||
+		params.mode === 'dab' ||
 		params.rtl433 === true ||
 		params.adsb === true ||
 		params.ais === true ||
@@ -208,5 +209,7 @@ function disabledDecoders(params: VfoParams): VfoParams {
 		radiosonde: false,
 		ble: false,
 		acars: false,
+		// DAB decodes whenever its mode is selected; only the planner sees this copy.
+		mode: params.mode === 'dab' ? '' : params.mode,
 	};
 }

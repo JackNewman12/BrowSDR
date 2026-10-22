@@ -74,7 +74,33 @@ const validators: Record<string, (value: Record<string, unknown>) => boolean> = 
 		(value.status.ber === null || typeof value.status.ber === 'number') &&
 		typeof value.status.codewords === 'number',
 	rds: (value: Record<string, unknown>) => validIndex(value.vfoIndex) && numbers(value, ['freq']) && validRdsMessage(value.msg),
+	dab_status: (value: Record<string, unknown>) => validIndex(value.vfoIndex) && validDabStatus(value.status),
 };
+
+function validDabStatus(value: unknown): boolean {
+	return (
+		isRecord(value) &&
+		['loading', 'receiving', 'error'].includes(String(value.state)) &&
+		typeof value.sync === 'boolean' &&
+		typedFields(value, ['message', 'ensemble', 'dls', 'audioMode'], 'string') &&
+		numbers(value, ['snr', 'ensembleId', 'playing', 'frameErrors', 'rsErrors', 'aacErrors']) &&
+		Array.isArray(value.services) &&
+		value.services.every(
+			(service: unknown) =>
+				isRecord(service) &&
+				numbers(service, ['id', 'bitrate']) &&
+				typedFields(service, ['label', 'programType', 'language', 'protection'], 'string') &&
+				typeof service.dabPlus === 'boolean',
+		) &&
+		Array.isArray(value.constellation) &&
+		value.constellation.every((point: unknown) => typeof point === 'number' && Number.isFinite(point)) &&
+		optionalFields(value, ['time'], 'string') &&
+		optionalFields(value, ['utcOffset'], 'number') &&
+		// Only inline images: a URL would make the client fetch from wherever the host chose.
+		(value.slide === undefined ||
+			(typeof value.slide === 'string' && /^(data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+)?$/.test(value.slide)))
+	);
+}
 
 function validRadio(value: unknown): boolean {
 	return numbers(value, ['centerFreq', 'frequencyShift', 'sampleRate', 'fftSize']);

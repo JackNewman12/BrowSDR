@@ -162,8 +162,7 @@
 					<option v-for="c in receiver.dabChannels()" :key="c.name" :value="c.name">{{ c.name }} · {{ c.freq.toFixed(3) }}</option>
 				</UiSelect>
 			</UiFormRow>
-			<div v-if="receiver.remoteMode === 'client'" class="dab-warning">DAB station lists are not sent over remote access yet. Run DAB on the computer with the SDR.</div>
-			<div v-else-if="!receiver.dabFits(vfo.freq)" class="dab-warning">The 1.5 MHz ensemble must fit inside the received band. Centre the radio on this channel or raise the sample rate.</div>
+			<div v-if="!receiver.dabFits(vfo.freq)" class="dab-warning">The 1.5 MHz ensemble must fit inside the received band. Centre the radio on this channel or raise the sample rate.</div>
 			<div v-else-if="receiver.deviceCapabilities?.deviceType === 'rtlsdr' && receiver.radio.sampleRate > 2400000" class="dab-warning">RTL-SDR drops samples above 2.4 MS/s, which breaks DAB audio. Use 2.048 or 2.4 MS/s.</div>
 			<div class="dab-status">
 				<span class="dab-dot" :class="{ synced: receiver.dabStatus[i]?.sync }"></span>
