@@ -6,6 +6,7 @@ import type { AdsbMessage } from '@/worker/decoders/adsb/types';
 import type { VfoParams } from './types';
 import type { RDSMessage, Rtl433Message } from '@/worker/decoders/types';
 import type { DSDStatus } from '@/worker/decoders/dsd/types';
+import type { DabStatus } from '@/worker/decoders/types';
 
 export interface SharedBandOutput {
 	centerBin: number;
@@ -23,6 +24,7 @@ export type DspOutput =
 	| AcarsMessage
 	| { type: 'rds'; msg: RDSMessage }
 	| { type: 'dsd_status'; status: DSDStatus }
+	| { type: 'dab_status'; status: DabStatus }
 	| { type: 'dsp_debug_log'; level: 'log' | 'warn' | 'error'; message: string }
 	| { type: 'error'; error: string; inputSamples?: number; chunkId?: number }
 	| { type: 'processed'; chunkId: number }

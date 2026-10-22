@@ -1,0 +1,81 @@
+.dab-panel {
+	padding: 4px 8px;
+	margin: 4px 0;
+	font-size: 11px;
+	line-height: 1.6;
+	background: rgba(0, 0, 0, 0.3);
+	border-radius: 4px;
+}
+.dab-status {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.dab-dot {
+	width: 8px;
+	height: 8px;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: #666;
+}
+.dab-dot.synced {
+	background: #44cc44;
+}
+.dab-ensemble {
+	font-weight: 700;
+	color: #fff;
+}
+.dab-snr,
+.dab-detail {
+	color: #aaa;
+	font-size: 10px;
+}
+.dab-snr {
+	margin-left: auto;
+}
+.dab-warning {
+	color: #ff8844;
+}
+.dab-constellation {
+	display: block;
+	width: 120px;
+	height: 120px;
+	margin: 4px auto 0;
+	background: #111;
+	border-radius: 4px;
+}
+.dab-axes {
+	stroke: #333;
+	stroke-width: 0.02;
+}
+.dab-points {
+	stroke: #4fc3f7;
+	stroke-width: 0.06;
+	stroke-linecap: round;
+}
+/* Fit the station cards instead of the fixed log-panel height. */
+.pocsag-panel.dab-dock {
+	height: auto;
+	max-height: 50vh;
+}
+.dab-cards {
+	flex: 1;
+	overflow-y: auto;
+}
+.dab-card {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.dab-card-text {
+	flex: 1;
+	min-width: 0;
+}
+.dab-slide {
+	width: 160px;
+	aspect-ratio: 4 / 3;
+	flex-shrink: 0;
+	object-fit: contain;
+	background: #000;
+	border-radius: 4px;
+}

@@ -17,7 +17,7 @@
 	</UiPanelHeader>
 	<div class="panel-body panel-condensed" v-show="!receiver.collapsedPanels['vfo-' + i]">
 		<div class="mode-grid">
-			<UiRadio v-for="m in ['nfm','am','usb','lsb','wfm','dsb','cw','raw','dsd']" :key="m" :value="m" v-model="vfo.mode" :name="receiver.receiverId + '-mode-' + i" @change="receiver.applyModeDefaults(i)">{{ m.toUpperCase() }}</UiRadio>
+			<UiRadio v-for="m in ['nfm','am','usb','lsb','wfm','dsb','cw','raw','dsd','dab']" :key="m" :value="m" v-model="vfo.mode" :name="receiver.receiverId + '-mode-' + i" @change="receiver.applyModeDefaults(i)">{{ m.toUpperCase() }}</UiRadio>
 		</div>
 
 		<UiFormRow>
@@ -152,6 +152,31 @@
 			<div v-if="receiver.dsdStatus[i]?.mbelibLoaded != null" :style="{color: receiver.dsdStatus[i]?.mbelibLoaded ? '#888' : '#ff8844',fontSize:'10px',marginTop:'2px'}">
 				{{ receiver.dsdStatus[i]?.mbelibError || (receiver.dsdStatus[i]?.mbelibLoaded ? 'Voice decoder ready' : 'Loading voice decoder...') }}
 			</div>
+		</div>
+
+		<div class="dab-panel" v-if="vfo.mode === 'dab'">
+			<UiFormRow>
+				<label :for="receiver.receiverId + '-dab-channel-' + i" style="flex: 0 0 90px;">Channel</label>
+				<UiSelect :id="receiver.receiverId + '-dab-channel-' + i" :model-value="receiver.dabChannelName(vfo.freq)" @update:model-value="receiver.tuneDabChannel(i, $event)" style="width: 130px; margin-left: auto;">
+					<option value="" disabled>Custom</option>
+					<option v-for="c in receiver.dabChannels()" :key="c.name" :value="c.name">{{ c.name }} · {{ c.freq.toFixed(3) }}</option>
+				</UiSelect>
+			</UiFormRow>
+			<div v-if="!receiver.dabFits(vfo.freq) && receiver.remoteMode === 'client' && receiver.locks.centerFreq" class="dab-warning">This channel is outside the received band, and the host has locked the centre frequency.</div>
+			<div v-else-if="!receiver.dabFits(vfo.freq)" class="dab-warning">The 1.5 MHz ensemble must fit inside the received band. Centre the radio on this channel or raise the sample rate.</div>
+			<div v-else-if="receiver.deviceCapabilities?.deviceType === 'rtlsdr' && receiver.radio.sampleRate > 2400000" class="dab-warning">RTL-SDR drops samples above 2.4 MS/s, which breaks DAB audio. Use 2.048 or 2.4 MS/s.</div>
+			<div class="dab-status">
+				<span class="dab-dot" :class="{ synced: receiver.dabStatus[i]?.sync }"></span>
+				<span class="dab-ensemble">{{ receiver.dabStatus[i]?.ensemble || (receiver.dabStatus[i]?.sync ? 'Reading ensemble…' : receiver.dabStatus[i]?.message || 'Waiting for samples') }}</span>
+				<span v-if="receiver.dabStatus[i]?.sync" class="dab-snr">SNR {{ receiver.dabStatus[i].snr.toFixed(1) }} dB</span>
+			</div>
+			<UiFormRow v-if="receiver.dabStatus[i]?.services?.length">
+				<label :for="receiver.receiverId + '-dab-service-' + i" style="flex: 0 0 90px;">Station</label>
+				<UiSelect :id="receiver.receiverId + '-dab-service-' + i" v-model.number="vfo.dabService" style="width: 160px; margin-left: auto;">
+					<option :value="0" disabled>Choose a station</option>
+					<option v-for="s in receiver.dabServices(i)" :key="s.id" :value="s.id">{{ s.label || '0x' + s.id.toString(16).toUpperCase() }}{{ s.dabPlus ? '' : ' (DAB)' }}</option>
+				</UiSelect>
+			</UiFormRow>
 		</div>
 
 		<UiFormRow v-if="vfo.mode === 'wfm' && vfo.rds" style="align-items: center;">

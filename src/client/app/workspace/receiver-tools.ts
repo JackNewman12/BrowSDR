@@ -34,6 +34,14 @@ function toolGroups(receiver: AppInstance): UiMenuGroup[] {
 					open: receiver.rds.panelOpen,
 				},
 				{
+					id: 'dab',
+					label: 'DAB Radio',
+					description: 'Digital radio · now playing & slideshow',
+					icon: 'radio',
+					active: vfos.some((vfo) => vfo.mode === 'dab'),
+					open: receiver.dab.panelOpen,
+				},
+				{
 					id: 'rtl433',
 					label: 'Wireless Sensors',
 					description: 'Sensor & device data · rtl_433',
@@ -128,6 +136,7 @@ function selectTool(receiver: AppInstance, id: string, openOnly = false): void {
 			whisper: receiver.whisper,
 			pocsag: receiver.pocsag,
 			rds: receiver.rds,
+			dab: receiver.dab,
 			rtl433: receiver.rtl433,
 			adsb: receiver.adsb,
 			ble: receiver.ble,

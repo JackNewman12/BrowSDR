@@ -313,9 +313,7 @@ export const connectionMethods = {
 					this._onRdsMessage(vfoIndex, freq, msg),
 				),
 				Comlink.proxy((vfoIndex: number, status: Parameters<AppInstance['_onDsdStatus']>[1]) => this._onDsdStatus(vfoIndex, status)),
-				Comlink.proxy((vfoIndex: number, freq: number, msg: Parameters<AppInstance['_onRtl433Message']>[2]) =>
-					this._onRtl433Message(vfoIndex, freq, msg),
-				),
+				Comlink.proxy(this._onRtl433Message.bind(this)),
 				Comlink.proxy((index: number, freq: number, msg: Parameters<AppInstance['_onAdsbMessage']>[2]) =>
 					this._onAdsbMessage(index, freq, msg),
 				),
@@ -325,6 +323,7 @@ export const connectionMethods = {
 				Comlink.proxy(this._onBleMessage.bind(this)),
 				Comlink.proxy(this._onAcarsMessage.bind(this)),
 				Comlink.proxy(this._onRadiosondeMessage.bind(this)),
+				Comlink.proxy(this._onDabStatus.bind(this)),
 			);
 		} catch (e) {
 			console.error('Error starting RX stream:', e);

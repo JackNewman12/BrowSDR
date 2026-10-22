@@ -16,4 +16,5 @@
 @import './styles/about.css';
 @import './styles/decoders/ble.css';
 @import './styles/decoders/acars.css';
+@import './styles/decoders/dab.css';
 @import './styles/tools/discovery.css';

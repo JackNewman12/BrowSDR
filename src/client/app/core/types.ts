@@ -10,6 +10,8 @@ export interface Vfo {
 	rtl433?: boolean;
 	rtl433SampleRate?: number;
 	rtl433Protocols?: string;
+	/** DAB service ID selected in the station list; 0 when none. */
+	dabService?: number;
 	enabled: boolean;
 	freq: number;
 	mode: string;

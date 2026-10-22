@@ -45,7 +45,7 @@ Enjoy the power of a desktop SDR platform fully within your web browser.
   Monitor the entire RF band visually with an ultra-responsive, GPU-accelerated waterfall and spectrum analyzer.
   Waterfall scrolling and spectrum smoothing are time-based: higher FPS makes animation smoother without speeding up the history. The 512-row waterfall retains approximately 25.6 seconds of continuous reception at every target.
 - **📻 Wide Demodulation Support**
-  Supports WFM, NFM, AM, USB, LSB, DSB, CW, and raw IQ modes.
+  Supports WFM, NFM, AM, USB, LSB, DSB, CW, [DAB/DAB+](docs/dab.md), and raw IQ modes.
 - **📡 RDS Decoding on the Fly**
   Instantly decode station name, programme type, and radiotext on WFM signals.
 - **🎛️ Full DSP Toolset**

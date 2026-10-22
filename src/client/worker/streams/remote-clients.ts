@@ -12,8 +12,10 @@ import type {
 	AcarsCallback,
 	HostCallback,
 	HostStats,
+	RemoteDabStatus,
 } from '@/worker/runtime/callbacks.types';
 import type { DspAudio, DspOutput } from '@/worker/runtime/dsp-messages.types';
+import type { DabStatus } from '@/worker/decoders/types';
 /*
 Copyright (c) 2026, jLynx <https://github.com/jLynx>
 
@@ -75,6 +77,10 @@ export function setRemoteHostPocsagStatusCallback(this: Backend, callback: HostC
 
 export function setRemoteHostRdsCallback(this: Backend, callback: HostCallback<Parameters<RdsCallback>>): void {
 	this._remoteHostRdsCb = callback;
+}
+
+export function setRemoteHostDabCallback(this: Backend, callback: HostCallback<[number, RemoteDabStatus]>): void {
+	this._remoteHostDabCb = callback;
 }
 
 export function setRemoteHostRtl433Callback(this: Backend, callback: HostCallback<Parameters<Rtl433Callback>>): void {
@@ -272,6 +278,7 @@ export function removeRemoteVfo(this: Backend, clientId: string, index: number):
 	state.audioQueues.splice(index, 1);
 	state.pocsagDecoders.splice(index, 1);
 	state.rdsDecoders.splice(index, 1);
+	state.dabSlides?.splice(index, 1);
 	state.squelchOpen.splice(index, 1);
 
 	return Promise.resolve(true);
@@ -509,6 +516,19 @@ function forwardAcars(
 	if (params?.acars && params.freq === message.freq) backend._remoteHostAcarsCb?.(clientId, index, params.freq, message);
 }
 
+function forwardDab(backend: Backend, clientId: string, state: RemoteClientState, index: number, status: DabStatus): void {
+	if (state.params[index]?.mode !== 'dab') return;
+	const slides = (state.dabSlides ??= []);
+	// Slides are tens of kilobytes; status repeats five times a second.
+	if (status.slide === slides[index]) {
+		const { slide: _unchanged, ...rest } = status;
+		backend._remoteHostDabCb?.(clientId, index, rest);
+	} else {
+		slides[index] = status.slide;
+		backend._remoteHostDabCb?.(clientId, index, status);
+	}
+}
+
 function forwardPacketMessage(backend: Backend, clientId: string, state: RemoteClientState, index: number, msg: DspOutput): boolean {
 	if (msg.type === 'ble') {
 		forwardBle(backend, clientId, state, index, msg);
@@ -529,6 +549,10 @@ function forwardPacketMessage(backend: Backend, clientId: string, state: RemoteC
 	}
 	if (msg.type === 'adsb') {
 		forwardAdsb(backend, clientId, state, index, msg);
+		return true;
+	}
+	if (msg.type === 'dab_status') {
+		forwardDab(backend, clientId, state, index, msg.status);
 		return true;
 	}
 	return false;

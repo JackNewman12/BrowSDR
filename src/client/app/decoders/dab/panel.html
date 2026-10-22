@@ -1,0 +1,46 @@
+<!-- DAB Panel -->
+<div class="pocsag-panel dab-dock" v-if="dab.panelOpen">
+	<UiToolHeader variant="pocsag" closable close-label="Close DAB panel" @close="dab.panelOpen = false">
+		DAB Radio
+		<span class="pocsag-count" v-if="dabVfos().length">{{ dabVfos().length }} VFO{{ dabVfos().length > 1 ? 's' : '' }}</span>
+	</UiToolHeader>
+	<div class="dab-cards">
+		<UiEmptyState v-if="dabVfos().length === 0" variant="pocsag">
+			Set a VFO to DAB mode, pick a channel, then choose a station.
+		</UiEmptyState>
+		<div v-for="i in dabVfos()" :key="i" class="rds-station-card dab-card" :style="{ borderLeftColor: vfoColor(i) }">
+			<img v-if="dabStatus[i]?.slide" class="dab-slide" :src="dabStatus[i].slide" alt="Station slideshow" />
+			<div class="dab-card-text">
+				<div class="rds-station">
+					<span class="rds-ps">{{ dabStationLabel(i) || dabStatus[i]?.ensemble || 'No station' }}</span>
+					<span class="rds-freq"
+						>{{ dabChannelName(vfos[i].freq) || vfos[i].freq.toFixed(3) }}<template v-if="dabStatus[i]?.ensemble">
+							· {{ dabStatus[i].ensemble }}</template
+						></span
+					>
+				</div>
+				<div class="dab-detail" v-if="dabStationInfo(i)">{{ dabStationInfo(i) }}</div>
+				<div class="rds-rt" v-if="dabStatus[i]?.dls">{{ dabStatus[i].dls }}</div>
+				<div class="dab-detail">
+					<template v-if="dabStatus[i]?.sync">SNR {{ dabStatus[i].snr.toFixed(1) }} dB</template>
+					<template v-else>{{ dabStatus[i]?.message || 'Waiting for samples' }}</template>
+					<template v-if="dabBroadcastTime(i)"> · {{ dabBroadcastTime(i) }}</template>
+					<template v-if="dabStatus[i]?.audioMode"> · {{ dabStatus[i].audioMode }}</template>
+					<template v-if="dabStatus[i]?.rsErrors || dabStatus[i]?.aacErrors">
+						· errors RS {{ dabStatus[i].rsErrors }} AAC {{ dabStatus[i].aacErrors }}</template
+					>
+				</div>
+			</div>
+			<svg
+				v-if="dabStatus[i]?.constellation?.length"
+				class="dab-constellation"
+				viewBox="-2 -2 4 4"
+				role="img"
+				aria-label="DQPSK constellation"
+			>
+				<path d="M-2 0H2M0 -2V2" class="dab-axes" />
+				<path :d="dabConstellationPath(i)" class="dab-points" />
+			</svg>
+		</div>
+	</div>
+</div>

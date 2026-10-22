@@ -64,7 +64,7 @@ export const NativeCheckbox: Story = {
 export const Modes: Story = {
 	render: () => ({
 		components,
-		setup: () => ({ value: ref('nfm'), modes: ['nfm', 'am', 'usb', 'lsb', 'wfm', 'dsb', 'cw', 'raw', 'dsd'] }),
+		setup: () => ({ value: ref('nfm'), modes: ['nfm', 'am', 'usb', 'lsb', 'wfm', 'dsb', 'cw', 'raw', 'dsd', 'dab'] }),
 		template:
 			'<div class="mode-grid" style="max-width:320px"><UiRadio v-for="mode in modes" :key="mode" v-model="value" :value="mode" name="modes">{{ mode.toUpperCase() }}</UiRadio></div>',
 	}),

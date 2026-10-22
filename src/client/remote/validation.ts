@@ -74,7 +74,38 @@ const validators: Record<string, (value: Record<string, unknown>) => boolean> = 
 		(value.status.ber === null || typeof value.status.ber === 'number') &&
 		typeof value.status.codewords === 'number',
 	rds: (value: Record<string, unknown>) => validIndex(value.vfoIndex) && numbers(value, ['freq']) && validRdsMessage(value.msg),
+	dab_status: (value: Record<string, unknown>) => validIndex(value.vfoIndex) && validDabStatus(value.status),
 };
+
+function validDabStatus(value: unknown): boolean {
+	return (
+		isRecord(value) &&
+		['loading', 'receiving', 'error'].includes(String(value.state)) &&
+		typeof value.sync === 'boolean' &&
+		typedFields(value, ['message', 'ensemble', 'dls', 'audioMode'], 'string') &&
+		numbers(value, ['snr', 'ensembleId', 'playing', 'frameErrors', 'rsErrors', 'aacErrors']) &&
+		Array.isArray(value.services) &&
+		value.services.length <= 256 &&
+		value.services.every(
+			(service: unknown) =>
+				isRecord(service) &&
+				numbers(service, ['id', 'bitrate']) &&
+				typedFields(service, ['label', 'programType', 'language', 'protection'], 'string') &&
+				typeof service.dabPlus === 'boolean',
+		) &&
+		Array.isArray(value.constellation) &&
+		// welle sends at most 1200 points (2400 numbers) per frame in transmission mode I.
+		value.constellation.length <= 4096 &&
+		value.constellation.every((point: unknown) => typeof point === 'number' && Number.isFinite(point)) &&
+		optionalFields(value, ['time'], 'string') &&
+		optionalFields(value, ['utcOffset'], 'number') &&
+		// Only inline images: a URL would make the client fetch from wherever the host chose.
+		(value.slide === undefined ||
+			(typeof value.slide === 'string' &&
+				value.slide.length <= 1_000_000 &&
+				/^(data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+)?$/.test(value.slide)))
+	);
+}
 
 function validRadio(value: unknown): boolean {
 	return numbers(value, ['centerFreq', 'frequencyShift', 'sampleRate', 'fftSize']);
@@ -119,6 +150,7 @@ function validVfoParams(value: unknown): boolean {
 		typedFields(value, ['enabled', 'squelchEnabled', 'lowPass', 'highPass', 'pocsag', 'rds'], 'boolean') &&
 		optionalFields(value, ['rtl433', 'audioMuted', 'adsb', 'ais', 'radiosonde', 'ble', 'acars'], 'boolean') &&
 		optionalFields(value, ['rtl433SampleRate'], 'number') &&
+		(value.dabService === undefined || (Number.isInteger(value.dabService) && Number(value.dabService) >= 0)) &&
 		optionalFields(value, ['rtl433Protocols'], 'string') &&
 		(value.pocsagCharset === undefined ||
 			(isRecord(value.pocsagCharset) && typedFields(value.pocsagCharset, ['vendor', 'model', 'codepage'], 'string'))) &&

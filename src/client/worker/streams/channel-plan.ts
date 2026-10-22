@@ -17,7 +17,8 @@ export function planSharedBands(sampleRate: number, centerFreq: number, params: 
 				value.ble ||
 				value.acars ||
 				value.rtl433 ||
-				(value.rds && value.mode === 'wfm'),
+				(value.rds && value.mode === 'wfm') ||
+				value.mode === 'dab',
 		);
 	const direct = active.map(({ index }) => index);
 	const fallback = { ratio: 1, sampleRate, bands: [], direct };

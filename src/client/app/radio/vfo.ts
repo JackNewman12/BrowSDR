@@ -98,6 +98,7 @@ export const vfoMethods = {
 				rtl433: vfo.rtl433 && inBandwidth,
 				rtl433SampleRate: vfo.rtl433SampleRate,
 				rtl433Protocols: vfo.rtl433Protocols,
+				dabService: vfo.dabService,
 			};
 
 			if (this.remoteMode === 'client' && this._webrtc) {
@@ -330,6 +331,7 @@ export const vfoMethods = {
 		this.ais?.sources.splice(index, 1);
 		this.radiosonde?.sources.splice(index, 1);
 		this.acars?.sources.splice(index, 1);
+		this.dabStatus?.splice(index, 1);
 		if (this.backend && this.running) {
 			if (this.remoteMode === 'client' && this._webrtc) {
 				this._webrtc.sendCommand({ type: 'removeRemoteVfo', index });

@@ -58,6 +58,11 @@ describe('shared VFO band planning', () => {
 		expect(plan.bands.find((band) => band.vfos.includes(3)).centerBin).toBe(mode === 'usb' ? 128 : 0);
 		expect(plan.bands.find((band) => band.vfos.includes(4)).centerBin).toBeCloseTo(mode === 'lsb' ? -128 : 0);
 	});
+	it('keeps a muted DAB VFO receiving IQ so its station list stays current', () => {
+		const dab = { freq: 202.928, enabled: false, mode: 'dab', bandwidth: 1536000 };
+		expect(planSharedBands(2048000, 202.928, [dab], true).direct).toEqual([0]);
+		expect(planSharedBands(2048000, 202.928, [{ ...dab, mode: 'nfm' }], true).direct).toEqual([]);
+	});
 	it('updates routes for tuning, muting, and independent pager reception', () => {
 		const values = params.map((value) => ({ ...value }));
 		values[0].enabled = false;

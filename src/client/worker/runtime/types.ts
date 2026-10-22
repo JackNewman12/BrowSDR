@@ -53,6 +53,8 @@ export interface VfoParams {
 	pocsagSecondGuess?: boolean;
 	rds: boolean;
 	rdsRegion: string;
+	/** DAB service ID to play when mode === 'dab'; 0 plays nothing. */
+	dabService?: number;
 }
 
 export interface VfoState {
@@ -153,6 +155,8 @@ export interface RemoteClientState {
 	/** Per-index charset key currently applied, to detect live changes. */
 	pocsagCharsets?: Array<CharsetKey | undefined>;
 	rdsDecoders: Array<RDSDecoder | null>;
+	/** Per-index slide last sent, so unchanged slides are not resent. */
+	dabSlides?: string[];
 	squelchOpen: boolean[];
 }
 

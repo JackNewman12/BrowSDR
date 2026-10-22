@@ -61,3 +61,8 @@ __pycache__/
 .claude
 .emsdk
 .codex/environments/environment.toml
+
+# Downloaded upstream welle.io source (see wasm/welle/README.md)
+/wasm/welle/welle.io-*/
+/wasm/welle/source.tar.gz
+/wasm/welle/build/

@@ -7,11 +7,10 @@ import { errorMessage } from '@/platform/errors';
 import init, { DspProcessor, SharedChannelizer, set_panic_hook, alloc_iq_buffer, alloc_float_buffer } from '/wasm/dsp/browsdr_dsp.js';
 import { RationalResampler } from './streams/dsp-pipeline';
 import { demodulateSideband, sidebandOffsetHz } from './decoders/ssb';
-import { DSDStream } from './decoders/dsd/dsd-stream';
+import { DAB_RATE } from './decoders/dab';
+import { DigitalAudio } from './runtime/digital-audio';
 import { DSD_IF_RATE } from '@/worker/decoders/dsd/constants';
-import type { DSDStatus } from './decoders/dsd/types';
 import { RDSDecoder } from './decoders/rds';
-import { LatestStatus } from './runtime/latest-status';
 import { AdsbStream } from './decoders/adsb';
 import { Rtl433Stream } from './decoders/rtl433';
 import type { InitOutput } from '/wasm/dsp/browsdr_dsp.js';
@@ -79,6 +78,7 @@ const IF_RATES: Record<string, number> = {
 	cw: 3000,
 	raw: 48000,
 	dsd: DSD_IF_RATE,
+	dab: DAB_RATE,
 };
 const AUDIO_RATE = 48000;
 
@@ -110,9 +110,8 @@ async function startup(): Promise<void> {
 
 let systemSampleRate = 2000000;
 
-// DSD decoder state (per-worker, one DSD decoder per VFO)
-let dsdStream: DSDStream | null = null;
-const dsdStatus = new LatestStatus<DSDStatus>((status) => self.postMessage({ type: 'dsd_status', status }));
+// DSD and DAB decoder state (per-worker, one VFO per worker)
+const digital = new DigitalAudio((message) => self.postMessage(message));
 
 self.onmessage = async (e: MessageEvent<DspInput>) => {
 	const msg = e.data;
@@ -177,7 +176,7 @@ function configureDDC(params: VfoParams, systemCenterFreq: number): void {
 		return;
 	}
 	const modeChanged = vfoState.lastMode !== params.mode;
-	if (modeChanged) dsdStatus.reset();
+	if (modeChanged) digital.resetStatus();
 	if (vfoState.currentIfRate !== ifRate || modeChanged) {
 		vfoState.audioResampler = new RationalResampler(ifRate, AUDIO_RATE);
 		if (vfoState.currentIfRate === ifRate) ddc.reset();
@@ -204,21 +203,7 @@ function configureDDC(params: VfoParams, systemCenterFreq: number): void {
 		ddc.set_wfm_mode(false);
 	}
 
-	// Initialize or destroy DSD decoder based on mode
-	if (params.mode === 'dsd') {
-		if (!dsdStream) {
-			dsdStream = new DSDStream((status: DSDStatus) => {
-				// Post DSD status to main thread
-				dsdStatus.push(status);
-			});
-		}
-		dsdStream.configure(params.freq, params.bandwidth, params.enabled, systemSampleRate);
-	} else {
-		if (dsdStream) {
-			dsdStream.reset();
-			dsdStream = null;
-		}
-	}
+	digital.configure(params, systemSampleRate);
 
 	// Apply UI audio filters (High Pass 300Hz, Low Pass BW/2)
 	ddc.set_audio_filters(params.lowPass || false, params.highPass || false);
@@ -286,12 +271,9 @@ function processVfoAudio(chunkLenBytes: number, params: VfoParams): Float32Array
 		}
 		const audioDemodRateSamples = vfoState.scratchBuf.subarray(0, numDemodSamples);
 
-		if (mode === 'dsd') {
-			const squelched = params.squelchEnabled && squelchDb < params.squelchLevel;
-			const audio = decodeDigitalAudio(_ddcOut, squelched, numDemodSamples);
-			// DSD emits paced silence while scanning or receiving data. An open
-			// RF squelch alone is not evidence of decoded voice playback.
-			vfoState.squelchOpen = dsdStream?.audioActive ?? false;
+		if (mode === 'dsd' || mode === 'dab') {
+			const audio = digital.process(mode, _ddcOut, params.squelchEnabled && squelchDb < params.squelchLevel);
+			vfoState.squelchOpen = digital.audioActive;
 			return audio;
 		}
 
@@ -503,8 +485,7 @@ function handleDspInit(msg: Extract<DspInput, { type: 'init' }>) {
 	ble.reset();
 	acars.reset();
 	inputIsFloat = false;
-	dsdStatus.reset();
-	dsdStream?.reset();
+	digital.reset();
 	systemSampleRate = msg.sampleRate;
 	inputCenterFreq = msg.centerFreq;
 	// Initialize the DDC and VFO state
@@ -578,7 +559,7 @@ function handleDspProcess(msg: Extract<DspInput, { type: 'process' }>) {
 				{
 					type: 'audio',
 					samples: cloneOut.buffer,
-					channels: msg.params.mode === 'wfm' && msg.params.stereo ? 2 : 1,
+					channels: (msg.params.mode === 'wfm' && msg.params.stereo) || msg.params.mode === 'dab' ? 2 : 1,
 					chunkId: msg.chunkId,
 					squelchOpen: vfoState.squelchOpen,
 					squelchDb: vfoState.squelchDb ?? -120,
@@ -655,15 +636,12 @@ function copyInputPayload(msg: Extract<DspInput, { type: 'process' }>): boolean 
 	return true;
 }
 
-function decodeDigitalAudio(iq: Float32Array, squelched: boolean, count: number) {
-	return dsdStream?.process(iq, squelched) ?? new Float32Array(count);
-}
-
 function needsVfoInput(params: VfoParams): boolean {
 	return (
 		params.enabled ||
 		params.pocsag ||
 		(params.rds && params.mode === 'wfm') ||
+		params.mode === 'dab' ||
 		params.rtl433 === true ||
 		[params.adsb, params.ais, params.radiosonde, params.ble, params.acars].some((enabled) => enabled === true)
 	);
@@ -674,5 +652,6 @@ function configurePacketDecoders(params: VfoParams, center: number): void {
 }
 
 function decodeVfoAudio(length: number, params: VfoParams): Float32Array | null {
-	return params.enabled || params.pocsag || params.rds ? processVfoAudio(length, params) : null;
+	// DAB keeps decoding while muted so its station list and now-playing text stay current.
+	return params.enabled || params.pocsag || params.rds || params.mode === 'dab' ? processVfoAudio(length, params) : null;
 }

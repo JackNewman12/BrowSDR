@@ -4,6 +4,7 @@ import type { RadiosondeMessage } from '@/worker/decoders/radiosonde/types';
 import type { AcarsMessage } from '@/worker/decoders/acars/types';
 import type { AdsbMessage } from '@/worker/decoders/adsb/types';
 import type { DSDStatus } from '@/worker/decoders/dsd/types';
+import type { DabStatus } from '@/worker/decoders/types';
 import type { Rtl433Message, POCSAGMessage, POCSAGStatus, RDSMessage } from '@/worker/decoders/types';
 import type { PerfReport } from './types';
 
@@ -21,5 +22,8 @@ export type AcarsCallback = DecoderCallback<AcarsMessage>;
 export type AdsbCallback = DecoderCallback<AdsbMessage>;
 export type Rtl433Callback = DecoderCallback<Rtl433Message>;
 export type DsdCallback = (index: number, status: DSDStatus) => void;
+export type DabCallback = (index: number, status: DabStatus) => void;
+/** Remote DAB status; slide is omitted when unchanged since the last send to that client. */
+export type RemoteDabStatus = Omit<DabStatus, 'slide'> & { slide?: string };
 export type HostCallback<T extends unknown[]> = (clientId: string, ...args: T) => void;
 export type HostStats = PerfReport & { source: string; channelization: { bands: number; vfos: number; sampleRate: number } };
