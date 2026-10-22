@@ -14,6 +14,7 @@ import * as remoteBackend from '@/worker/streams/remote-clients';
 import { remoteMethods } from '@/app/workspace/remote';
 import { dabMethods } from '@/app/decoders/dab';
 import { isReceiverCommand } from '@/remote/validation';
+import { vfoMethods } from '@/app/radio/vfo';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -91,5 +92,29 @@ describe('remote DAB status', () => {
 		expect(isReceiverCommand(command({ services: [{ ...status.services[0], label: 7 }] }))).toBe(false);
 		expect(isReceiverCommand(command({ slide: 'https://example.com/track.png' }))).toBe(false);
 		expect(isReceiverCommand(command({ slide: 'data:image/svg+xml;base64,PHN2Zz4=' }))).toBe(false);
+		expect(isReceiverCommand(command({ constellation: new Array(4097).fill(0) }))).toBe(false);
+		expect(isReceiverCommand(command({ services: new Array(257).fill(status.services[0]) }))).toBe(false);
+	});
+
+	it('keeps each VFO with its own status and slide after removing an earlier VFO', async () => {
+		const client = {
+			remoteMode: 'client',
+			running: false,
+			vfos: [{ ...params }, { ...params }],
+			dabStatus: [],
+			...dabMethods,
+			...vfoMethods,
+		};
+		remoteMethods.handleRemoteCommand.call(client, {
+			type: 'dab_status',
+			vfoIndex: 0,
+			status: { ...status, slide: 'data:image/png;base64,AAAA' },
+		});
+		remoteMethods.handleRemoteCommand.call(client, { type: 'dab_status', vfoIndex: 1, status });
+		await client.removeVfo(0);
+		// The host's per-VFO slide cache shifts too, so the next update for VFO 0 omits the unchanged slide.
+		const { slide: _unchanged, ...rest } = status;
+		remoteMethods.handleRemoteCommand.call(client, { type: 'dab_status', vfoIndex: 0, status: rest });
+		expect(client.dabStatus[0].slide).toBe(slide);
 	});
 });
